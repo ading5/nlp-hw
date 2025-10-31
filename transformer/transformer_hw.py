@@ -16,6 +16,7 @@ reference_text = "Today we are going to implement a Transformer from scratch!"
 tokens = reference_gpt2.to_tokens(reference_text).to(device)
 logits, cache = reference_gpt2.run_with_cache(tokens)
 
+
 @dataclass
 class Config:
     d_model: int = 768
@@ -29,6 +30,7 @@ class Config:
     n_heads: int = 12
     n_layers: int = 12
 
+
 cfg = Config()
 
 
@@ -41,10 +43,11 @@ class LayerNorm(nn.Module):
 
     def forward(self, residual: Float[Tensor, "batch posn d_model"]) -> Float[Tensor, "batch posn d_model"]:
         mean = residual.mean(dim=-1, keepdim=True).to(device)
-        variance = residual.var(dim=-1, keepdim=True, correction=False).to(device) # new pytorch uses correction not unbiased
-        
+        variance = residual.var(dim=-1, keepdim=True, correction=False).to(device)  # new pytorch uses correction not unbiased
+
         y = (((residual.to(device) - mean) / (torch.sqrt(variance + cfg.layer_norm_eps))) * self.w + self.b)
         return y.to(device)
+
 
 class Embed(nn.Module):
     def __init__(self, cfg: Config):
@@ -55,8 +58,6 @@ class Embed(nn.Module):
 
     def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_model"]:
         return self.W_E[tokens].to(device)
-
-
 
 
 class PosEmbed(nn.Module):
@@ -72,6 +73,7 @@ class PosEmbed(nn.Module):
         pos_emb = self.W_pos[torch.arange(seq_len, device=device)]
         pos_emb = pos_emb.unsqueeze(0).expand(batch_size, -1, -1)
         return pos_emb
+
 
 class Attention(nn.Module):
     IGNORE: Float[Tensor, ""]
@@ -91,11 +93,10 @@ class Attention(nn.Module):
         nn.init.normal_(self.W_K, std=self.cfg.init_range)
         nn.init.normal_(self.W_V, std=self.cfg.init_range)
         nn.init.normal_(self.W_O, std=self.cfg.init_range)
-        self.register_buffer("IGNORE",torch.tensor(-1e5, dtype=torch.float32, device=device))
+        self.register_buffer("IGNORE", torch.tensor(-1e5, dtype=torch.float32, device=device))
 
-    def apply_causal_mask(
-        self, attn_scores: Float[Tensor, "batch n_heads query_pos key_pos"]
-    ) -> Float[Tensor, "batch n_heads query_pos key_pos"]:
+    def apply_causal_mask(self, attn_scores: Float[Tensor, "batch n_heads query_pos key_pos"]
+                          ) -> Float[Tensor, "batch n_heads query_pos key_pos"]:
         '''
         Applies a causal mask to attention scores, and returns masked scores.
         '''
@@ -104,9 +105,8 @@ class Attention(nn.Module):
         mask = mask.to(torch.bool)
         return attn_scores.masked_fill(mask, self.IGNORE)
 
-    def forward(
-        self, normalized_resid_pre: Float[Tensor, "batch posn d_model"]
-    ) -> Float[Tensor, "batch posn d_model"]:
+    def forward(self, normalized_resid_pre: Float[Tensor, "batch posn d_model"]
+                ) -> Float[Tensor, "batch posn d_model"]:
         # Linear Mapping: compute matrices Q, K, and V
         q = einops.einsum(normalized_resid_pre, self.W_Q, 'a b c, x c y -> a b x y') + self.b_Q
         k = einops.einsum(normalized_resid_pre, self.W_K, 'a b c, x c y -> a b x y') + self.b_K
@@ -144,11 +144,12 @@ class MLP(nn.Module):
         nn.init.normal_(self.W_in, std=self.cfg.init_range)
         nn.init.normal_(self.W_out, std=self.cfg.init_range)
 
-    def forward(
-        self, normalized_resid_mid: Float[Tensor, "batch posn d_model"]
-    ) -> Float[Tensor, "batch posn d_model"]:
-      pass
-
+    def forward(self, normalized_resid_mid: Float[Tensor, "batch posn d_model"]
+                ) -> Float[Tensor, "batch posn d_model"]:
+        step_1 = normalized_resid_mid @ self.W_in + self.b_in
+        step_2 = gelu_new(step_1)
+        step_3 = step_2 @ self.W_out + self.b_out
+        return step_3
 
 class TransformerBlock(nn.Module):
     def __init__(self, cfg: Config):
@@ -159,10 +160,8 @@ class TransformerBlock(nn.Module):
         self.ln2 = LayerNorm(cfg)
         self.mlp = MLP(cfg)
 
-    def forward(
-        self, resid_pre: Float[Tensor, "batch position d_model"]
-    ) -> Float[Tensor, "batch position d_model"]:
-        #implement your solution here
+    def forward(self, resid_pre: Float[Tensor, "batch position d_model"]
+                ) -> Float[Tensor, "batch position d_model"]:
         pass
 
 
@@ -174,11 +173,11 @@ class Unembed(nn.Module):
         nn.init.normal_(self.W_U, std=self.cfg.init_range)
         self.b_U = nn.Parameter(torch.zeros((cfg.d_vocab), requires_grad=False))
 
-    def forward(
-        self, normalized_resid_final: Float[Tensor, "batch position d_model"]
-    ) -> Float[Tensor, "batch position d_vocab"]:
-        #implement your solution here
+    def forward(self, normalized_resid_final: Float[Tensor, "batch position d_model"]
+                ) -> Float[Tensor, "batch position d_vocab"]:
+        # implement your solution here
         pass
+
 
 class DemoTransformer(nn.Module):
     def __init__(self, cfg: Config):
@@ -191,8 +190,9 @@ class DemoTransformer(nn.Module):
         self.unembed = Unembed(cfg)
 
     def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_vocab"]:
-        #implement your solution here
+        # implement your solution here
         pass
+
 
 def greedy_decode(model, start_tokens, max_new_tokens):
     """
@@ -207,24 +207,22 @@ def greedy_decode(model, start_tokens, max_new_tokens):
     - A list of generated token IDs, including the start_tokens.
     """
     with torch.no_grad():  # Disable gradient calculation for inference
-        generated = start_tokens # Shape: [1, seq_len]
-
+        generated = start_tokens  # Shape: [1, seq_len]
 
         pass
         # implement your solution here
 
-
-
     return generated
+
 
 if __name__ == "__main__":
     # Load reference model only when running this file directly
     reference_gpt2 = HookedTransformer.from_pretrained("gpt2-small", fold_ln=False, center_unembed=False, center_writing_weights=False)
-    
+
     reference_text = "Today we are going to implement a Transformer from scratch!"
     tokens = reference_gpt2.to_tokens(reference_text).to(device)
     logits, cache = reference_gpt2.run_with_cache(tokens)
-    
+
     demo_gpt2 = DemoTransformer(Config(debug=False)).to(device)
     demo_gpt2.load_state_dict(reference_gpt2.state_dict(), strict=False)
 
