@@ -174,11 +174,9 @@ class Unembed(nn.Module):
         nn.init.normal_(self.W_U, std=self.cfg.init_range)
         self.b_U = nn.Parameter(torch.zeros((cfg.d_vocab), requires_grad=False))
 
-    def forward(
-        self, normalized_resid_final: Float[Tensor, "batch position d_model"]
-    ) -> Float[Tensor, "batch position d_vocab"]:
-        #implement your solution here
-        pass
+    def forward(self, normalized_resid_final: Float[Tensor, "batch position d_model"]
+                ) -> Float[Tensor, "batch position d_vocab"]:
+        return normalized_resid_final @ self.W_U + self.b_U
 
 class DemoTransformer(nn.Module):
     def __init__(self, cfg: Config):
