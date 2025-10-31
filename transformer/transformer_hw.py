@@ -40,8 +40,11 @@ class LayerNorm(nn.Module):
         self.b = nn.Parameter(torch.zeros(cfg.d_model))
 
     def forward(self, residual: Float[Tensor, "batch posn d_model"]) -> Float[Tensor, "batch posn d_model"]:
-        # implement your solution here
-        pass
+        mean = residual.mean(dim=-1, keepdim=True).to(device)
+        variance = residual.var(dim=-1, keepdim=True, correction=False).to(device) # new pytorch uses correction not unbiased
+        
+        y = (((residual.to(device) - mean) / (torch.sqrt(variance + cfg.layer_norm_eps))) * self.w + self.b)
+        return y.to(device)
 
 class Embed(nn.Module):
     def __init__(self, cfg: Config):
@@ -51,8 +54,7 @@ class Embed(nn.Module):
         nn.init.normal_(self.W_E, std=self.cfg.init_range)
 
     def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_model"]:
-        #implement your solution here
-        pass
+        return self.W_E[tokens].to(device)
 
 
 
@@ -65,9 +67,11 @@ class PosEmbed(nn.Module):
         nn.init.normal_(self.W_pos, std=self.cfg.init_range)
 
     def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_model"]:
-        #implement your solution here
-        pass
-
+        seq_len = tokens.shape[1]
+        batch_size = tokens.shape[0]
+        pos_emb = self.W_pos[torch.arange(seq_len, device=device)]
+        pos_emb = pos_emb.unsqueeze(0).expand(batch_size, -1, -1)
+        return pos_emb
 
 class Attention(nn.Module):
     IGNORE: Float[Tensor, ""]
@@ -104,12 +108,12 @@ class Attention(nn.Module):
         self, normalized_resid_pre: Float[Tensor, "batch posn d_model"]
     ) -> Float[Tensor, "batch posn d_model"]:
         # Linear Mapping: compute matrices Q, K, and V
-        q = einops.einsum(normalized_resid_pre, self.W_Q, '[fill in pattern here]') + self.b_Q
-        k = einops.einsum(normalized_resid_pre, self.W_K, '[fill in pattern here]') + self.b_K
-        v = einops.einsum(normalized_resid_pre, self.W_V, '[fill in pattern here]') + self.b_V
+        q = einops.einsum(normalized_resid_pre, self.W_Q, 'a b c, x c y -> a b x y') + self.b_Q
+        k = einops.einsum(normalized_resid_pre, self.W_K, 'a b c, x c y -> a b x y') + self.b_K
+        v = einops.einsum(normalized_resid_pre, self.W_V, 'a b c, x c y -> a b x y') + self.b_V
 
         # dot product to compute attention scores
-        a = einops.einsum(q, k, '[fill in pattern here]')
+        a = einops.einsum(q, k, 'a b x y, a b x y -> a b x')
 
         # re-scale
         a = a / (self.cfg.d_head ** 0.5)
@@ -121,10 +125,10 @@ class Attention(nn.Module):
         a = a.softmax(dim=-1)
 
         # get get weighted sum of values
-        z = einops.einsum(v, a, '[fill in pattern here]')
+        z = einops.einsum(v, a, 'a b x y, a b x-> a b x y')
 
         # sum over different heads
-        attn_out = einops.einsum(z, self.W_O, '[fill in pattern here]') + self.b_O
+        attn_out = einops.einsum(z, self.W_O, 'a b x y, x y -> a b y') + self.b_O
 
         return attn_out
 
