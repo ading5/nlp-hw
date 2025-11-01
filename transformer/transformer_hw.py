@@ -145,10 +145,10 @@ class MLP(nn.Module):
 
     def forward(self, normalized_resid_mid: Float[Tensor, "batch posn d_model"]
                 ) -> Float[Tensor, "batch posn d_model"]:
-        step_1 = normalized_resid_mid @ self.W_in + self.b_in
-        step_2 = gelu_new(step_1)
-        step_3 = step_2 @ self.W_out + self.b_out
-        return step_3
+        x = normalized_resid_mid @ self.W_in + self.b_in
+        x = gelu_new(x)
+        x = x @ self.W_out + self.b_out
+        return x
 
 class TransformerBlock(nn.Module):
     def __init__(self, cfg: Config):
@@ -161,9 +161,9 @@ class TransformerBlock(nn.Module):
 
     def forward(self, resid_pre: Float[Tensor, "batch position d_model"]
                 ) -> Float[Tensor, "batch position d_model"]:
-        step_1 = resid_pre + self.attn(self.ln1(resid_pre))
-        step_2 = step_1 + self.mlp(self.ln2(step_1))
-        return step_2
+        x = resid_pre + self.attn(self.ln1(resid_pre))
+        x = x + self.mlp(self.ln2(x))
+        return x
 
 
 class Unembed(nn.Module):
@@ -189,8 +189,12 @@ class DemoTransformer(nn.Module):
         self.unembed = Unembed(cfg)
 
     def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_vocab"]:
-        #implement your solution here
-        pass
+        x = self.embed(tokens) + self.pos_embed(tokens)
+        for block in self.blocks:
+            x = block(x)
+        x = self.ln_final(x)
+        x = self.unembed(x)
+        return x
 
 def greedy_decode(model, start_tokens, max_new_tokens):
     """
