@@ -159,11 +159,11 @@ class TransformerBlock(nn.Module):
         self.ln2 = LayerNorm(cfg)
         self.mlp = MLP(cfg)
 
-    def forward(
-        self, resid_pre: Float[Tensor, "batch position d_model"]
-    ) -> Float[Tensor, "batch position d_model"]:
-        #implement your solution here
-        pass
+    def forward(self, resid_pre: Float[Tensor, "batch position d_model"]
+                ) -> Float[Tensor, "batch position d_model"]:
+        step_1 = resid_pre + self.attn(self.ln1(resid_pre))
+        step_2 = step_1 + self.mlp(self.ln2(step_1))
+        return step_2
 
 
 class Unembed(nn.Module):
